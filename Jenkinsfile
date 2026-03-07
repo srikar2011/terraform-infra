@@ -12,7 +12,7 @@ pipeline {
   }
 
   environment {
-    NEXUS_URL     = 'http://YOUR-SERVER-IP:8081'
+    NEXUS_URL     = 'http://127.0.0.1:8081'
     NEXUS_REPO    = 'terraform-artifacts'
     SONAR_PROJECT = 'terraform-infra'
     TF_VERSION    = '1.7.5'
@@ -23,7 +23,7 @@ pipeline {
     stage('Checkout') {
       steps {
         git credentialsId: 'git-credentials',
-            url: 'git@github.com:YOUR-USERNAME/terraform-infra.git',
+            url: 'git@github.com:srikar2011/terraform-infra.git',
             branch: 'main'
       }
     }
