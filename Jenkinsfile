@@ -210,4 +210,49 @@ pipeline {
       cleanWs()
     }
   }
+
+    post {
+    success {
+      slackSend(
+        channel: env.SLACK_CHANNEL,
+        color: 'good',
+        message: """
+:white_check_mark: *BUILD SUCCESS* - Terraform
+*Job:* ${env.JOB_NAME}
+*Build:* #${env.BUILD_NUMBER}
+*Duration:* ${currentBuild.durationString}
+*Artifact:* terraform-infra-${env.BUILD_NUMBER}.tar.gz pushed to Nexus
+*URL:* ${env.BUILD_URL}
+        """.trim()
+      )
+    }
+    failure {
+      slackSend(
+        channel: env.SLACK_CHANNEL,
+        color: 'danger',
+        message: """
+:x: *BUILD FAILED* - Terraform
+*Job:* ${env.JOB_NAME}
+*Build:* #${env.BUILD_NUMBER}
+*Duration:* ${currentBuild.durationString}
+*URL:* ${env.BUILD_URL}console
+        """.trim()
+      )
+    }
+    unstable {
+      slackSend(
+        channel: env.SLACK_CHANNEL,
+        color: 'warning',
+        message: """
+:warning: *BUILD UNSTABLE* - Terraform
+*Job:* ${env.JOB_NAME}
+*Build:* #${env.BUILD_NUMBER}
+*URL:* ${env.BUILD_URL}
+        """.trim()
+      )
+    }
+    always {
+      cleanWs()
+    }
+  }
 }
