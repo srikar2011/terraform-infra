@@ -201,28 +201,16 @@ pipeline {
 
   post {
     success {
-      echo "SUCCESS: Terraform artifact built and published to Nexus successfully!"
-    }
-    failure {
-      echo "FAILED: Build failed - check console output above for details."
-    }
-    always {
-      cleanWs()
-    }
-  }
-
-    post {
-    success {
       slackSend(
         channel: env.SLACK_CHANNEL,
         color: 'good',
         message: """
-:white_check_mark: *BUILD SUCCESS* - Terraform
-*Job:* ${env.JOB_NAME}
-*Build:* #${env.BUILD_NUMBER}
-*Duration:* ${currentBuild.durationString}
-*Artifact:* terraform-infra-${env.BUILD_NUMBER}.tar.gz pushed to Nexus
-*URL:* ${env.BUILD_URL}
+  :white_check_mark: *BUILD SUCCESS* - Terraform
+  *Job:* ${env.JOB_NAME}
+  *Build:* #${env.BUILD_NUMBER}
+  *Duration:* ${currentBuild.durationString}
+  *Artifact:* terraform-infra-${env.BUILD_NUMBER}.tar.gz pushed to Nexus
+  *URL:* ${env.BUILD_URL}
         """.trim()
       )
     }
@@ -231,11 +219,11 @@ pipeline {
         channel: env.SLACK_CHANNEL,
         color: 'danger',
         message: """
-:x: *BUILD FAILED* - Terraform
-*Job:* ${env.JOB_NAME}
-*Build:* #${env.BUILD_NUMBER}
-*Duration:* ${currentBuild.durationString}
-*URL:* ${env.BUILD_URL}console
+  :x: *BUILD FAILED* - Terraform
+  *Job:* ${env.JOB_NAME}
+  *Build:* #${env.BUILD_NUMBER}
+  *Duration:* ${currentBuild.durationString}
+  *URL:* ${env.BUILD_URL}console
         """.trim()
       )
     }
@@ -244,10 +232,10 @@ pipeline {
         channel: env.SLACK_CHANNEL,
         color: 'warning',
         message: """
-:warning: *BUILD UNSTABLE* - Terraform
-*Job:* ${env.JOB_NAME}
-*Build:* #${env.BUILD_NUMBER}
-*URL:* ${env.BUILD_URL}
+  :warning: *BUILD UNSTABLE* - Terraform
+  *Job:* ${env.JOB_NAME}
+  *Build:* #${env.BUILD_NUMBER}
+  *URL:* ${env.BUILD_URL}
         """.trim()
       )
     }
