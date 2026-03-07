@@ -1,268 +1,199 @@
 pipeline {
   agent any
 
-  options {
-    timestamps()
-    timeout(time: 60, unit: 'MINUTES')
-    buildDiscarder(logRotator(numToKeepStr: '5'))
+  triggers {
+    pollSCM('H/5 * * * *')
   }
 
-  parameters {
-    string(name: 'TF_ARTIFACT_BUILD',   defaultValue: 'latest', description: 'Terraform build number or latest')
-    string(name: 'CHEF_ARTIFACT_BUILD', defaultValue: 'latest', description: 'Chef build number or latest')
-    choice(name: 'ENVIRONMENT',         choices: ['dev', 'staging', 'prod'], description: 'Target environment')
-    booleanParam(name: 'APPLY_TERRAFORM', defaultValue: true,  description: 'Run terraform apply?')
-    booleanParam(name: 'RUN_CHEF',        defaultValue: true,  description: 'Run Chef configuration?')
-    booleanParam(name: 'DESTROY',         defaultValue: false, description: 'Destroy infrastructure?')
+  options {
+    timestamps()
+    buildDiscarder(logRotator(numToKeepStr: '10'))
+    timeout(time: 30, unit: 'MINUTES')
   }
 
   environment {
-    NEXUS_URL            = 'http://127.0.0.1:8081'
-    TF_REPO              = 'terraform-artifacts'
-    CHEF_REPO            = 'chef-artifacts'
-    AWS_REGION           = 'us-east-1'
-    TF_VAR_environment   = "${params.ENVIRONMENT}"
-    TF_VAR_vpc_id        = 'vpc-XXXXXXXX'
-    TF_VAR_subnet_ids    = '["subnet-AAAA","subnet-BBBB"]'
-    TF_VAR_ec2_subnet_id = 'subnet-AAAA'
-    TF_VAR_key_pair_name = 'your-ec2-key-pair'
-    TF_VAR_app_name      = 'mywebapp'
+    NEXUS_URL     = 'http://YOUR-SERVER-IP:8081'
+    NEXUS_REPO    = 'terraform-artifacts'
+    SONAR_PROJECT = 'terraform-infra'
+    TF_VERSION    = '1.7.5'
   }
 
   stages {
 
-    stage('Download Artifacts from Nexus') {
+    stage('Checkout') {
+      steps {
+        git credentialsId: 'git-credentials',
+            url: 'git@github.com:YOUR-USERNAME/terraform-infra.git',
+            branch: 'main'
+      }
+    }
+
+    stage('Install Terraform') {
+      steps {
+        powershell '''
+          $tfPath = "C:\\tools\\terraform"
+
+          # Add to PATH for this session
+          $env:PATH = "$tfPath;$env:PATH"
+
+          # Check if already installed
+          try {
+            $installed = & "$tfPath\\terraform.exe" version 2>$null
+            if ($installed -match $env:TF_VERSION) {
+              Write-Host "Terraform $env:TF_VERSION already installed - skipping"
+              exit 0
+            }
+          } catch {}
+
+          Write-Host "Installing Terraform $env:TF_VERSION..."
+          New-Item -ItemType Directory -Force -Path $tfPath | Out-Null
+
+          $url = "https://releases.hashicorp.com/terraform/$env:TF_VERSION/terraform_$($env:TF_VERSION)_windows_amd64.zip"
+          Write-Host "Downloading from: $url"
+
+          Invoke-WebRequest -Uri $url -OutFile "$tfPath\\terraform.zip" -UseBasicParsing
+          Expand-Archive -Path "$tfPath\\terraform.zip" -DestinationPath $tfPath -Force
+          Remove-Item "$tfPath\\terraform.zip" -Force
+
+          # Add to system PATH permanently
+          $machinePath = [Environment]::GetEnvironmentVariable("PATH", "Machine")
+          if ($machinePath -notlike "*$tfPath*") {
+            [Environment]::SetEnvironmentVariable("PATH", "$machinePath;$tfPath", "Machine")
+            Write-Host "Added Terraform to system PATH"
+          }
+
+          Write-Host "Terraform installed successfully"
+          & "$tfPath\\terraform.exe" version
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+        '''
+      }
+    }
+
+    stage('Terraform Validate') {
+      steps {
+        powershell '''
+          $env:PATH = "C:\\tools\\terraform;$env:PATH"
+
+          Write-Host "Running terraform init..."
+          terraform init -backend=false
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "ERROR: terraform init failed"
+            exit 1
+          }
+
+          Write-Host "Running terraform validate..."
+          terraform validate
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "ERROR: terraform validate failed"
+            exit 1
+          }
+
+          Write-Host "Running terraform fmt check..."
+          terraform fmt -check -recursive
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "ERROR: terraform fmt check failed - run terraform fmt to fix formatting"
+            exit 1
+          }
+
+          Write-Host "All Terraform validations passed"
+        '''
+      }
+    }
+
+    stage('SonarQube Analysis') {
+      steps {
+        withSonarQubeEnv('SonarQube') {
+          powershell '''
+            $env:PATH = "C:\\tools\\sonar-scanner\\bin;$env:PATH"
+
+            Write-Host "Running SonarQube analysis..."
+            Write-Host "Project: $env:SONAR_PROJECT"
+            Write-Host "Build: $env:BUILD_NUMBER"
+
+            sonar-scanner.bat `
+              "-Dsonar.projectKey=$env:SONAR_PROJECT" `
+              "-Dsonar.projectName=Terraform Infrastructure" `
+              "-Dsonar.sources=." `
+              "-Dsonar.exclusions=**/.terraform/**,*.tfstate*,**/*.tfvars" `
+              "-Dsonar.projectVersion=$env:BUILD_NUMBER"
+
+            if ($LASTEXITCODE -ne 0) {
+              Write-Host "ERROR: SonarQube analysis failed"
+              exit 1
+            }
+            Write-Host "SonarQube analysis complete"
+          '''
+        }
+      }
+    }
+
+    stage('SonarQube Quality Gate') {
+      steps {
+        timeout(time: 10, unit: 'MINUTES') {
+          waitForQualityGate abortPipeline: true
+        }
+      }
+    }
+
+    stage('Package Artifact') {
+      steps {
+        powershell '''
+          Write-Host "Cleaning Terraform temp files..."
+          Remove-Item -Recurse -Force ".terraform"       -ErrorAction SilentlyContinue
+          Remove-Item -Force ".terraform.lock.hcl"       -ErrorAction SilentlyContinue
+          Remove-Item -Force "*.tfstate"                 -ErrorAction SilentlyContinue
+          Remove-Item -Force "*.tfstate.backup"          -ErrorAction SilentlyContinue
+          Remove-Item -Force "artifact_name.txt"         -ErrorAction SilentlyContinue
+
+          $artifactName = "terraform-infra-$env:BUILD_NUMBER.tar.gz"
+          Write-Host "Creating package: $artifactName"
+
+          tar -czf $artifactName `
+            --exclude=".git" `
+            --exclude=".sonarqube" `
+            --exclude="Jenkinsfile" `
+            --exclude="artifact_name.txt" `
+            .
+
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "ERROR: Failed to create artifact package"
+            exit 1
+          }
+
+          $sizeKB = [math]::Round((Get-Item $artifactName).Length / 1KB, 2)
+          Write-Host "Package created: $artifactName ($sizeKB KB)"
+
+          # Save artifact name for Push stage
+          $artifactName | Out-File -FilePath "artifact_name.txt" -Encoding UTF8 -NoNewline
+        '''
+      }
+    }
+
+    stage('Push to Nexus') {
       steps {
         withCredentials([usernamePassword(
           credentialsId: 'nexus-credentials',
           usernameVariable: 'NEXUS_USER',
           passwordVariable: 'NEXUS_PASS')]) {
           powershell '''
-            New-Item -ItemType Directory -Force -Path "terraform"
-            New-Item -ItemType Directory -Force -Path "chef"
+            $artifactName = (Get-Content "artifact_name.txt" -Raw).Trim()
+            $url = "$env:NEXUS_URL/repository/$env:NEXUS_REPO/$artifactName"
 
-            # Download Terraform artifact
-            if ($env:TF_ARTIFACT_BUILD -eq "latest") {
-              $response = Invoke-RestMethod `
-                -Uri "$env:NEXUS_URL/service/rest/v1/components?repository=$env:TF_REPO" `
-                -Credential (New-Object PSCredential($env:NEXUS_USER,
-                  (ConvertTo-SecureString $env:NEXUS_PASS -AsPlainText -Force)))
-              $tfFile = ($response.items | Sort-Object version -Descending |
-                Select-Object -First 1).assets[0].path.Split("/")[-1]
-            } else {
-              $tfFile = "terraform-infra-$env:TF_ARTIFACT_BUILD.tar.gz"
-            }
+            Write-Host "Uploading artifact: $artifactName"
+            Write-Host "Nexus URL: $url"
 
-            Write-Host "Downloading Terraform artifact: $tfFile"
-            curl.exe -s -u "$env:NEXUS_USER`:$env:NEXUS_PASS" `
-              -o "terraform\\$tfFile" `
-              "$env:NEXUS_URL/repository/$env:TF_REPO/$tfFile"
-            tar -xzf "terraform\\$tfFile" -C terraform/
-            Write-Host "Terraform artifact extracted"
-
-            # Download Chef artifact
-            if ($env:CHEF_ARTIFACT_BUILD -eq "latest") {
-              $response = Invoke-RestMethod `
-                -Uri "$env:NEXUS_URL/service/rest/v1/components?repository=$env:CHEF_REPO" `
-                -Credential (New-Object PSCredential($env:NEXUS_USER,
-                  (ConvertTo-SecureString $env:NEXUS_PASS -AsPlainText -Force)))
-              $chefFile = ($response.items | Sort-Object version -Descending |
-                Select-Object -First 1).assets[0].path.Split("/")[-1]
-            } else {
-              $chefFile = "chef-config-$env:CHEF_ARTIFACT_BUILD.tar.gz"
-            }
-
-            Write-Host "Downloading Chef artifact: $chefFile"
-            curl.exe -s -u "$env:NEXUS_USER`:$env:NEXUS_PASS" `
-              -o "chef\\$chefFile" `
-              "$env:NEXUS_URL/repository/$env:CHEF_REPO/$chefFile"
-            tar -xzf "chef\\$chefFile" -C chef/
-            Write-Host "Chef artifact extracted"
-          '''
-        }
-      }
-    }
-
-    stage('Terraform Init') {
-      steps {
-        withCredentials([[
-          $class: 'AmazonWebServicesCredentialsBinding',
-          credentialsId: 'aws-credentials']]) {
-          powershell '''
-            $env:PATH += ";C:\\tools\\terraform"
-            Set-Location terraform
-            terraform init
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-            $ws = $env:ENVIRONMENT
-            terraform workspace select $ws
-            if ($LASTEXITCODE -ne 0) {
-              terraform workspace new $ws
-            }
-          '''
-        }
-      }
-    }
-
-    stage('Terraform Plan') {
-      steps {
-        withCredentials([[
-          $class: 'AmazonWebServicesCredentialsBinding',
-          credentialsId: 'aws-credentials']]) {
-          powershell '''
-            $env:PATH += ";C:\\tools\\terraform"
-            Set-Location terraform
-            terraform plan `
-              -var="environment=$env:ENVIRONMENT" `
-              -out=tfplan
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-            Write-Host "Terraform plan complete"
-          '''
-        }
-      }
-    }
-
-    stage('Approval Gate') {
-      when {
-        expression { return params.ENVIRONMENT == 'prod' }
-      }
-      steps {
-        input message: 'Approve deployment to PRODUCTION?',
-              ok: 'Deploy to Prod',
-              submitter: 'admin'
-      }
-    }
-
-    stage('Terraform Apply or Destroy') {
-      when {
-        expression { return params.APPLY_TERRAFORM }
-      }
-      steps {
-        withCredentials([[
-          $class: 'AmazonWebServicesCredentialsBinding',
-          credentialsId: 'aws-credentials']]) {
-          powershell '''
-            $env:PATH += ";C:\\tools\\terraform"
-            Set-Location terraform
-
-            if ($env:DESTROY -eq "true") {
-              terraform destroy -auto-approve `
-                -var="environment=$env:ENVIRONMENT"
-            } else {
-              terraform apply -auto-approve tfplan
-              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-              terraform output -json | Out-File -FilePath "..\tf_outputs.json" -Encoding UTF8
-              Write-Host "Terraform apply complete"
-              Get-Content "..\tf_outputs.json"
-            }
-          '''
-        }
-      }
-    }
-
-    stage('Wait for EC2 Bootstrap') {
-      when {
-        expression { return params.APPLY_TERRAFORM && !params.DESTROY }
-      }
-      steps {
-        withCredentials([[
-          $class: 'AmazonWebServicesCredentialsBinding',
-          credentialsId: 'aws-credentials']]) {
-          powershell '''
-            $outputs = Get-Content "tf_outputs.json" | ConvertFrom-Json
-            $ec2Id = $outputs.ec2_instance_id.value
-            Write-Host "Waiting for EC2 $ec2Id to pass status checks..."
-
-            aws ec2 wait instance-status-ok `
-              --instance-ids $ec2Id `
-              --region $env:AWS_REGION
-
-            Write-Host "EC2 ready - waiting 60s for WinRM bootstrap..."
-            Start-Sleep -Seconds 60
-          '''
-        }
-      }
-    }
-
-    stage('Chef Configuration') {
-      when {
-        expression { return params.RUN_CHEF && !params.DESTROY }
-      }
-      steps {
-        withCredentials([[
-          $class: 'AmazonWebServicesCredentialsBinding',
-          credentialsId: 'aws-credentials']]) {
-          powershell '''
-            $outputs = Get-Content "tf_outputs.json" | ConvertFrom-Json
-            $ec2Id = $outputs.ec2_instance_id.value
-            $ec2Ip = $outputs.ec2_private_ip.value
-            Write-Host "Running Chef on EC2 $ec2Id at $ec2Ip"
-
-            # Upload cookbooks to S3
-            aws s3 cp chef\\cookbooks s3://YOUR-S3-BUCKET/chef/cookbooks `
-              --recursive --region $env:AWS_REGION
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-            # Run chef-client via SSM
-            $commandId = aws ssm send-command `
-              --document-name "AWS-RunPowerShellScript" `
-              --targets "Key=instanceids,Values=$ec2Id" `
-              --parameters commands=["aws s3 cp s3://YOUR-S3-BUCKET/chef/cookbooks C:/chef/cookbooks --recursive; chef-client --local-mode -o webserver --chef-license accept"] `
-              --region $env:AWS_REGION `
-              --output text `
-              --query Command.CommandId
-
-            Write-Host "SSM Command ID: $commandId"
-
-            # Wait for completion
-            aws ssm wait command-executed `
-              --command-id $commandId `
-              --instance-id $ec2Id `
-              --region $env:AWS_REGION
+            curl.exe -s -w "\nHTTP Status: %{http_code}\n" `
+              -u "$env:NEXUS_USER`:$env:NEXUS_PASS" `
+              --upload-file $artifactName `
+              $url
 
             if ($LASTEXITCODE -ne 0) {
-              Write-Host "Chef run failed!"
-              exit $LASTEXITCODE
+              Write-Host "ERROR: Upload to Nexus failed!"
+              exit 1
             }
-            Write-Host "Chef configuration complete"
+            Write-Host "Successfully uploaded to Nexus: $url"
           '''
         }
-      }
-    }
-
-    stage('Verify Deployment') {
-      when {
-        expression { return !params.DESTROY }
-      }
-      steps {
-        powershell '''
-          $outputs = Get-Content "tf_outputs.json" | ConvertFrom-Json
-          $albDns = $outputs.alb_dns_name.value
-          Write-Host "Testing health check at http://$albDns/health"
-          Start-Sleep -Seconds 30
-
-          $success = $false
-          for ($i = 1; $i -le 5; $i++) {
-            try {
-              $response = Invoke-WebRequest `
-                -Uri "http://$albDns/health" `
-                -UseBasicParsing `
-                -TimeoutSec 10
-              Write-Host "Attempt $i`: HTTP Status = $($response.StatusCode)"
-              if ($response.StatusCode -eq 200) {
-                Write-Host "SUCCESS: Application healthy at http://$albDns"
-                $success = $true
-                break
-              }
-            } catch {
-              Write-Host "Attempt $i`: Failed - $($_.Exception.Message)"
-            }
-            Start-Sleep -Seconds 20
-          }
-
-          if (-not $success) {
-            Write-Host "WARN: Health check did not return 200 after 5 attempts"
-          }
-        '''
       }
     }
 
@@ -270,10 +201,10 @@ pipeline {
 
   post {
     success {
-      echo "Deployment complete! Infrastructure and configuration applied."
+      echo "SUCCESS: Terraform artifact built and published to Nexus successfully!"
     }
     failure {
-      echo "Deployment failed. Check logs above."
+      echo "FAILED: Build failed - check console output above for details."
     }
     always {
       cleanWs()
