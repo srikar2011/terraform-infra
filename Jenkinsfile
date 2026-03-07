@@ -24,7 +24,7 @@
     stage('Checkout') {
       steps {
         git credentialsId: 'git-credentials',
-            url: 'git@github.com:git/terraform-infra.git',
+            url: 'git@github.com:srikar2011/terraform-infra.git',
             branch: 'main'
       }
     }
