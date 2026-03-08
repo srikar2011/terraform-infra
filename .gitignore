@@ -4,3 +4,9 @@
 *.tfstate.backup
 artifact_name.txt
 *.tar.gz
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
