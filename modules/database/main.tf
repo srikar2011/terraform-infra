@@ -19,8 +19,8 @@ resource "aws_db_instance" "app_db" {
   password          = "ChangeMe123!"
   license_model     = "license-included"
 
-  multi_az               = var.multi_az
-  skip_final_snapshot    = true
+  multi_az                = var.multi_az
+  skip_final_snapshot     = true
   backup_retention_period = var.backup_retention_days
 
   vpc_security_group_ids = [var.db_sg_id]
