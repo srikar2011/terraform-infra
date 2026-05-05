@@ -78,6 +78,13 @@ pipeline {
           Write-Host "Terraform version:"
           terraform -version
 
+          Write-Host "Initializing Terraform (modules only, no backend)..."
+          terraform init -backend=false -lock=false
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "ERROR: terraform init failed"
+            exit 1
+          }
+
           Write-Host "Validating Terraform configuration..."
           terraform validate
           if ($LASTEXITCODE -ne 0) {
