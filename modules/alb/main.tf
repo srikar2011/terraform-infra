@@ -73,9 +73,7 @@ resource "aws_lb_listener_rule" "api" {
 
   action {
     type = "forward"
-    target_group_arn = var.deploy_color == "blue"
-      ? aws_lb_target_group.backend_blue.arn
-      : aws_lb_target_group.backend_green.arn
+    target_group_arn = var.deploy_color == "blue" ? aws_lb_target_group.backend_blue.arn : aws_lb_target_group.backend_green.arn
   }
 
   condition {

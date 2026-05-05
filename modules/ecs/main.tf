@@ -88,10 +88,7 @@ resource "aws_ecs_service" "backend" {
   }
 
   load_balancer {
-    target_group_arn = var.deploy_color == "blue"
-      ? var.tg_backend_blue
-      : var.tg_backend_green
-
+    target_group_arn = var.deploy_color == "blue" ? var.tg_backend_blue : var.tg_backend_green
     container_name = "backend"
     container_port = 3001
   }
