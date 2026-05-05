@@ -1,2 +1,2 @@
-aws_region    = "ap-south-1"
-env   = "dev"
+aws_region = "ap-south-1"
+env        = "dev"

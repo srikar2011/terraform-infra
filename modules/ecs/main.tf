@@ -9,9 +9,9 @@ resource "aws_security_group" "ecs_sg" {
   }
 
   egress {
-    from_port = 0
-    to_port   = 0
-    protocol  = "-1"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
 }
@@ -24,8 +24,8 @@ resource "aws_ecs_task_definition" "backend" {
   family                   = "backend-${var.env}"
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"
-  cpu    = "256"
-  memory = "512"
+  cpu                      = "256"
+  memory                   = "512"
 
   container_definitions = jsonencode([{
     name  = "backend"
@@ -44,8 +44,8 @@ resource "aws_ecs_task_definition" "frontend" {
   family                   = "frontend-${var.env}"
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"
-  cpu    = "256"
-  memory = "512"
+  cpu                      = "256"
+  memory                   = "512"
 
   container_definitions = jsonencode([{
     name  = "frontend"
@@ -64,15 +64,15 @@ resource "aws_ecs_service" "backend" {
   desired_count = 1
 
   network_configuration {
-    subnets         = var.subnets
+    subnets          = var.subnets
     assign_public_ip = true
-    security_groups = [aws_security_group.ecs_sg.id]
+    security_groups  = [aws_security_group.ecs_sg.id]
   }
 
   load_balancer {
     target_group_arn = var.deploy_color == "blue" ? var.tg_backend_blue : var.tg_backend_green
-    container_name = "backend"
-    container_port = 3001
+    container_name   = "backend"
+    container_port   = 3001
   }
 }
 
@@ -85,9 +85,9 @@ resource "aws_ecs_service" "frontend" {
   desired_count = 1
 
   network_configuration {
-    subnets         = var.subnets
+    subnets          = var.subnets
     assign_public_ip = true
-    security_groups = [aws_security_group.ecs_sg.id]
+    security_groups  = [aws_security_group.ecs_sg.id]
   }
 
   load_balancer {

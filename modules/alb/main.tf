@@ -2,16 +2,16 @@ resource "aws_security_group" "alb_sg" {
   vpc_id = var.vpc_id
 
   ingress {
-    from_port = 80
-    to_port   = 80
-    protocol  = "tcp"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
   egress {
-    from_port = 0
-    to_port   = 0
-    protocol  = "-1"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
 }
@@ -54,7 +54,7 @@ resource "aws_lb_target_group" "backend_green" {
 
 resource "aws_lb_listener" "listener" {
   load_balancer_arn = aws_lb.alb.arn
-  port = 80
+  port              = 80
 
   default_action {
     type             = "forward"
@@ -67,7 +67,7 @@ resource "aws_lb_listener_rule" "api" {
   priority     = 1
 
   action {
-    type = "forward"
+    type             = "forward"
     target_group_arn = var.deploy_color == "blue" ? aws_lb_target_group.backend_blue.arn : aws_lb_target_group.backend_green.arn
   }
 
