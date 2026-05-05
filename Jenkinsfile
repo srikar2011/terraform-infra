@@ -100,7 +100,7 @@ pipeline {
           }
 
           Write-Host "Running lightweight plan (no backend, sanity check)..."
-          terraform plan -lock=false -input=false -refresh=false -no-color -var="env=dev" -var="image_tag=dummy" -var="deploy_color=blue" -var="backend_repo=dummy" -var="frontend_repo=dummy" -var="mongo_uri=dummy" -var-file="environments/dev.tfvars"
+          terraform plan -lock=false -input=false -refresh=false -backend=false -no-color -var="env=dev" -var="image_tag=dummy" -var="deploy_color=blue" -var="backend_repo=dummy" -var="frontend_repo=dummy" -var="mongo_uri=dummy" -var-file="environments/dev.tfvars"
           if ($LASTEXITCODE -ne 0) {
             Write-Host "ERROR: terraform plan validation failed"
             exit 1
