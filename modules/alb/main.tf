@@ -1,8 +1,3 @@
-variable "vpc_id" {}
-variable "subnets" {}
-variable "env" {}
-variable "deploy_color" {}
-
 resource "aws_security_group" "alb_sg" {
   vpc_id = var.vpc_id
 
