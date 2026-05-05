@@ -72,30 +72,41 @@ pipeline {
     stage('Terraform Validate') {
       steps {
         powershell '''
+          $ErrorActionPreference = "Stop"
           $env:PATH = "C:\\tools\\terraform;$env:PATH"
 
-          Write-Host "Running terraform init..."
+          Write-Host "Terraform version:"
+          terraform -version
+
+          Write-Host "Initializing Terraform (modules only, no backend)..."
           terraform init -backend=false
           if ($LASTEXITCODE -ne 0) {
             Write-Host "ERROR: terraform init failed"
             exit 1
           }
 
-          Write-Host "Running terraform validate..."
+          Write-Host "Validating Terraform configuration..."
           terraform validate
           if ($LASTEXITCODE -ne 0) {
             Write-Host "ERROR: terraform validate failed"
             exit 1
           }
 
-          Write-Host "Running terraform fmt check..."
+          Write-Host "Checking Terraform formatting..."
           terraform fmt -check -recursive
           if ($LASTEXITCODE -ne 0) {
-            Write-Host "ERROR: terraform fmt check failed - run terraform fmt to fix formatting"
+            Write-Host "ERROR: terraform fmt check failed. Run 'terraform fmt -recursive'"
             exit 1
           }
 
-          Write-Host "All Terraform validations passed"
+          Write-Host "Running lightweight plan (no backend, sanity check)..."
+          terraform plan -lock=false -input=false -refresh=false -no-color -var="env=dev" -var="image_tag=dummy" -var="deploy_color=blue" -var="backend_repo=dummy" -var="frontend_repo=dummy" -var="mongo_uri=dummy" -var-file="environments/dev.tfvars"
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "ERROR: terraform plan validation failed"
+            exit 1
+          }
+
+          Write-Host "All Terraform validations passed successfully"
         '''
       }
     }
@@ -145,7 +156,7 @@ pipeline {
           Remove-Item -Force "*.tfstate.backup"          -ErrorAction SilentlyContinue
           Remove-Item -Force "artifact_name.txt"         -ErrorAction SilentlyContinue
 
-          $artifactName = "terraform-infra-$env:BUILD_NUMBER.tar.gz"
+          $artifactName = "terraform-infra-$env:BUILD_NUMBER.zip"
           Write-Host "Creating package: $artifactName"
 
           tar -czf $artifactName `
