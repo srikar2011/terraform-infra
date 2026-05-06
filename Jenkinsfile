@@ -155,6 +155,8 @@ pipeline {
           tar -czf $artifactName `
             --exclude=".git" `
             --exclude=".sonarqube" `
+            -exclude=".scannerwork" `
+            --exclude=".gitignore" `
             --exclude="Jenkinsfile" `
             --exclude="artifact_name.txt" `
             .
