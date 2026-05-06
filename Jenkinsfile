@@ -79,21 +79,21 @@ pipeline {
           terraform -version
 
           Write-Host "Initializing Terraform (modules only, no backend)..."
-          terraform init -backend=false -lock=false
+          terraform init -backend=false -lock=false -no-color
           if ($LASTEXITCODE -ne 0) {
             Write-Host "ERROR: terraform init failed"
             exit 1
           }
 
           Write-Host "Validating Terraform configuration..."
-          terraform validate
+          terraform validate -no-color
           if ($LASTEXITCODE -ne 0) {
             Write-Host "ERROR: terraform validate failed"
             exit 1
           }
 
           Write-Host "Checking Terraform formatting..."
-          terraform fmt -check -recursive
+          terraform fmt -check -recursive -no-color
           if ($LASTEXITCODE -ne 0) {
             Write-Host "ERROR: terraform fmt check failed. Run 'terraform fmt -recursive'"
             exit 1
@@ -155,7 +155,7 @@ pipeline {
           tar -czf $artifactName `
             --exclude=".git" `
             --exclude=".sonarqube" `
-            -exclude=".scannerwork" `
+            --exclude=".scannerwork" `
             --exclude=".gitignore" `
             --exclude="Jenkinsfile" `
             --exclude="artifact_name.txt" `
