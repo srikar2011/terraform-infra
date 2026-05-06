@@ -28,6 +28,7 @@ resource "aws_lb_target_group" "frontend" {
   port     = 3000
   protocol = "HTTP"
   vpc_id   = var.vpc_id
+  target_type = "ip"
 }
 
 resource "aws_lb_target_group" "backend_blue" {
@@ -35,6 +36,7 @@ resource "aws_lb_target_group" "backend_blue" {
   port     = 3001
   protocol = "HTTP"
   vpc_id   = var.vpc_id
+  target_type = "ip"
 
   health_check {
     path = "/hello"
@@ -46,6 +48,7 @@ resource "aws_lb_target_group" "backend_green" {
   port     = 3001
   protocol = "HTTP"
   vpc_id   = var.vpc_id
+  target_type = "ip"
 
   health_check {
     path = "/hello"
