@@ -1,3 +1,8 @@
+data "aws_ssm_parameter" "mongo_uri" {
+  name            = var.mongo_ssm_parameter
+  with_decryption = true
+}
+
 resource "aws_security_group" "ecs_sg" {
   vpc_id = var.vpc_id
 
@@ -57,9 +62,16 @@ resource "aws_ecs_task_definition" "backend" {
     portMappings = [{ containerPort = 3001 }]
 
     environment = [
-      { name = "MONGO_URI", value = var.mongo_uri },
       { name = "PORT", value = "3001" }
     ]
+
+    secrets = [
+      {
+        name      = "MONGO_URI"
+        valueFrom = data.aws_ssm_parameter.mongo_uri.arn
+      }
+    ]
+
   }])
 }
 
@@ -119,4 +131,30 @@ resource "aws_ecs_service" "frontend" {
     container_name   = "frontend"
     container_port   = 3000
   }
+}
+
+resource "aws_iam_role_policy" "ssm_access" {
+  name = "ecs-ssm-access-${var.env}"
+  role = aws_iam_role.ecs_task_execution_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ssm:GetParameters",
+          "ssm:GetParameter"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "kms:Decrypt"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
 }

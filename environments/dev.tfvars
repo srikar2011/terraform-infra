@@ -6,3 +6,5 @@ public_subnets = [
   "10.0.1.0/24",
   "10.0.2.0/24"
 ]
+
+mongo_ssm_parameter = "/travelmemory/dev/mongo_uri"
