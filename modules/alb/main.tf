@@ -29,7 +29,7 @@ resource "aws_lb_target_group" "frontend" {
   protocol    = "HTTP"
   vpc_id      = var.vpc_id
   target_type = "ip"
-  
+
 }
 
 resource "aws_lb_target_group" "backend_blue" {
@@ -38,7 +38,7 @@ resource "aws_lb_target_group" "backend_blue" {
   protocol    = "HTTP"
   vpc_id      = var.vpc_id
   target_type = "ip"
- 
+
 
   health_check {
     path = "/hello"
