@@ -149,7 +149,7 @@ pipeline {
           Remove-Item -Force "*.tfstate.backup"          -ErrorAction SilentlyContinue
           Remove-Item -Force "artifact_name.txt"         -ErrorAction SilentlyContinue
 
-          $artifactName = "terraform-infra-$env:BUILD_NUMBER.zip"
+          $artifactName = "terraform-infra-$env:BUILD_NUMBER.tar.gz"
           Write-Host "Creating package: $artifactName"
 
           tar -czf $artifactName `
