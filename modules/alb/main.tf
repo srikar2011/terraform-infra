@@ -24,18 +24,18 @@ resource "aws_lb" "alb" {
 }
 
 resource "aws_lb_target_group" "frontend" {
-  name     = "tg-frontend-${var.env}"
-  port     = 3000
-  protocol = "HTTP"
-  vpc_id   = var.vpc_id
+  name        = "tg-frontend-${var.env}"
+  port        = 3000
+  protocol    = "HTTP"
+  vpc_id      = var.vpc_id
   target_type = "ip"
 }
 
 resource "aws_lb_target_group" "backend_blue" {
-  name     = "tg-backend-blue-${var.env}"
-  port     = 3001
-  protocol = "HTTP"
-  vpc_id   = var.vpc_id
+  name        = "tg-backend-blue-${var.env}"
+  port        = 3001
+  protocol    = "HTTP"
+  vpc_id      = var.vpc_id
   target_type = "ip"
 
   health_check {
@@ -44,10 +44,10 @@ resource "aws_lb_target_group" "backend_blue" {
 }
 
 resource "aws_lb_target_group" "backend_green" {
-  name     = "tg-backend-green-${var.env}"
-  port     = 3001
-  protocol = "HTTP"
-  vpc_id   = var.vpc_id
+  name        = "tg-backend-green-${var.env}"
+  port        = 3001
+  protocol    = "HTTP"
+  vpc_id      = var.vpc_id
   target_type = "ip"
 
   health_check {
