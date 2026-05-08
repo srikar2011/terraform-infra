@@ -31,4 +31,6 @@ module "ecs" {
   frontend_repo = var.frontend_repo
 
   mongo_uri = var.mongo_uri
+
+  mongo_ssm_parameter = var.mongo_ssm_parameter
 }

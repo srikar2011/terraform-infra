@@ -15,3 +15,7 @@ variable "backend_repo" {}
 variable "frontend_repo" {}
 
 variable "mongo_uri" {}
+
+variable "mongo_ssm_parameter" {
+  type = string
+}
