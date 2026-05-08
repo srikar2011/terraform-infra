@@ -41,7 +41,7 @@ resource "aws_lb_target_group" "backend_blue" {
 
 
   health_check {
-    path = "/hello"
+    path = "/api/hello"
   }
 }
 
@@ -54,7 +54,7 @@ resource "aws_lb_target_group" "backend_green" {
 
 
   health_check {
-    path = "/hello"
+    path = "/api/hello"
   }
 }
 
